@@ -1,0 +1,9 @@
+name:              Myslenie
+version:           1.0
+Build-Type:        Simple
+cabal-version:     >= 1.2
+
+executable Myslenie
+  main-is:         Main.hs
+  hs-source-dirs:  src
+  build-depends:   base, hmatrix, mtl, random, bytestring, utf8-string, easyplot, optparse-applicative, JuicyPixels, directory, containers, random-shuffle

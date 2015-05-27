@@ -42,7 +42,7 @@ solveLinear rate mom points = do
     void $ plot X11 $ Data2D [Title "Mean squared error", Style Lines] [] $ zip [1..] (fmap (meanSquaredError ys) result)
     showPoints "Labels" xs ys
 --    forM_ (takeNth 10 ([1..] `zip` result)) (\(i, us) -> showPoints (show i) xs us >> getLine)
-    plotAnimation "linear.gif" 3 (fmap (\(i, us) -> plotPoints (show i) xs us) (takeNth 10 ([1..] `zip` result)))
+    animatePlots "linear.gif" 3 (fmap (\(i, us) -> plotPoints (show i) xs us) (takeNth 10 ([1..] `zip` result)))
 
     where
         showPoints :: (KnownNat m) => String -> L m 2 -> L m 1 -> IO ()
@@ -79,13 +79,15 @@ makeTransformation rate1 mom1 rate2 mom2 = do
 
 solveTransformation :: Double -> Double -> Double -> Double -> Int -> Double -> IO ()
 solveTransformation rate1 mom1 rate2 mom2 epochs initRange = do
-    gen <- getStdGen
+--    gen <- getStdGen
+    let gen = mkStdGen 50
     xs <- readMatrix "test/transformation.txt" :: IO (L 4 4)
 
     let network = evalState (makeTransformation rate1 mom1 rate2 mom2 ) (randomInit initRange gen)
         result = evalState (replicateM epochs $ train xs (\r -> r - xs)) network
 
-    void $ plot (PNG $ "transformation" ++ (show rate1) ++ ".png") $ Data2D [Title "Mean squared error", Style Lines] [] $ zip [1..] (fmap (meanSquaredError xs) result)
+    void $ plot (PNG $ "transformation" ++ (show rate1) ++ "-" ++ show mom1 ++ ".png") $
+        Data2D [Title "Mean squared error", Style Lines] [] $ zip [1..] (fmap (meanSquaredError xs) result)
 --    print $ takeNth 100 result
 --    print $ meanSquaredError xs $ last result
     print $ last result
@@ -121,8 +123,8 @@ makeApproximation :: forall m . (KnownNat m) =>
 makeApproximation rate1 mom1 rate2 mom2 = do
     os1 <- takeMatrix
     os2 <- takeMatrix
-    let l1  = uncurry neuralLayer sigmoidPair (const rate1) (const mom1) os1 :: Network m 2 1
-        l2  = uncurry neuralLayer idPair      (const rate2) (const mom2) os2 :: Network m 2 1
+    let l1  = uncurry neuralLayer sigmoidPair (const rate1) (const mom1) os1 :: Network m 2 10
+        l2  = uncurry neuralLayer idPair      (const rate2) (const mom2) os2 :: Network m 11 1
     return $ bias >>> l1 >>> bias >>> l2
 
 solveApproximation :: Bool -> Double -> Double -> Double -> Double -> Int -> Double -> IO ()
@@ -142,11 +144,11 @@ solveApproximation alt = if not alt
             let network = evalState (makeApproximation rate1 mom1 rate2 mom2) (randomInit initRange gen)
                 ((resls, rests), trained) = runState ((fmap unzip . replicateM epochs) (trainEpoch ysl xsl >> zipM (predictInRows xsl) (predictInRows xst))) network
 
-            void $ plot (PNG "error.png")
+            void $ plot (PNG $ "error" ++ show rate1 ++ "-" ++ show mom1 ++ ".png")
                 [ Data2D [Title "Mean squared error - training set", Style Lines] [] $ zip [1..] (fmap (meanSquaredError ysl) resls)
                 , Data2D [Title "Mean squared error - test set",     Style Lines] [] $ zip [1..] (fmap (meanSquaredError yst) rests)
                 ]
-            void $ plot (PNG "predict.png")
+            void $ plot (PNG $ "predict" ++ show rate1 ++ "-" ++ show mom1 ++ ".png")
                 [ Data2D     [Title "Training set", Style Points, Color Red  ] [] $ zip (toList1 xsl) (toList1 ysl)
                 , Data2D     [Title "Test set",     Style Points, Color Black] [] $ zip (toList1 xst) (toList1 yst)
                 , Function2D [Title "Prediction",   Style Lines , Color Green] [] $ predictFunc trained

@@ -9,8 +9,8 @@ import Graphics.EasyPlot
 import System.Directory
 
 
-plotAnimation :: Plot a => FilePath -> GifDelay -> [a] -> IO ()
-plotAnimation path delay plots = do
+animatePlots :: Plot a => FilePath -> GifDelay -> [a] -> IO ()
+animatePlots path delay plots = do
     let names = take (length plots) $ fmap (\i -> path ++ "-" ++ show i) [0..]
 
     forM_ (plots `zip` names) $ \(p, n) -> plot (PNG n) p

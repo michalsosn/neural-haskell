@@ -100,10 +100,22 @@ kMeans os = Circuit $ \xs ->
 
     in  (kMeans os', os')
 
+rateFunc :: Double -> Double -> Double -> Int -> Double
+rateFunc rateStart rateEnd iters it = rateStart * (rateEnd / rateStart) ** (fromIntegral it / iters)
 
-clusteringError :: forall m1 m2 n . (KnownNat m1, KnownNat m2, KnownNat n) =>
+scaleFeatures :: forall m n . (KnownNat m, KnownNat n) =>
+                 L m n -> (R n -> R n, R n -> R n)
+scaleFeatures xs = let m = rowNum xs                                                            :: Double
+                       means = (tr xs) #> konst (1.0 / m)                                       :: R n
+                       stddevs = vmap sqrt (((tr xs) ** 2) #> konst (1.0 / m) - (means ** 2))   :: R n
+                       scale row = (row - means) / stddevs                                      :: R n
+                       descale row = row * stddevs + means                                      :: R n
+                   in (scale, descale)
+
+
+quantizationError :: forall m1 m2 n . (KnownNat m1, KnownNat m2, KnownNat n) =>
                    L m1 n -> L m2 n -> Double
-clusteringError xs os =
+quantizationError xs os =
             let m = rowNum xs                                                           :: Double
                 xos = xs <> tr os                                                       :: L m1 m2
                 os2 = (konst 1.0 :: L m1 1) <> tr ((os * os) <> (konst 1.0 :: L n 1))   :: L m1 m2
@@ -123,3 +135,9 @@ compressNearest xs os =
         uos = unwrap os
         nearest = fmap (fromJust . create . (uos H.!)) minIxs
     in fromRows nearest
+
+
+peakSignalToNoiseRatio :: (KnownNat m, KnownNat n) => Double -> L m n -> L m n -> Double
+peakSignalToNoiseRatio peak ys xs = let m = rowNum xs
+                                        mse = msum (((xs - ys) ** 2) / m)
+                                    in  10 * logBase 10 (peak * peak / mse)

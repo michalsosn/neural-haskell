@@ -41,6 +41,12 @@ total = accum' 0 (+)
 logger :: (a -> b) -> Circuit a [b]
 logger f = accum' [] (\a bs -> bs ++ [f a])
 
+delayChange :: Int -> Circuit a b -> Circuit a b
+delayChange 0 cir = cir
+delayChange n cir = Circuit $ \a ->
+    let (_, b) = cir `runCircuit` a
+    in  (delayChange (n - 1) cir, b)
+
 run :: a -> State (Circuit a b) b
 run xs = do
     (cir', ys) <- gets (`runCircuit` xs)
@@ -51,7 +57,6 @@ dryRun :: a -> State (Circuit a b) b
 dryRun xs = do
     (_, ys) <- gets (`runCircuit` xs)
     return ys
-
 
 newtype Feedback a b = Feedback { propagate :: a -> (b -> (Feedback a b, a), b) }
 

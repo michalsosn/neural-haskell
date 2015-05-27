@@ -20,6 +20,9 @@ msum m = (m #> konst 1.0) `dot` 1
 mmap :: (KnownNat m, KnownNat n) => (Double -> Double) -> L m n -> L m n
 mmap f = fromJust . create . H.cmap f . unwrap
 
+rmap :: (KnownNat m, KnownNat n) => (R n -> R n) -> L m n -> L m n
+rmap f = fromRows . fmap f . toRows
+
 rowNum :: (KnownNat m, KnownNat n, Fractional a) => L m n -> a
 rowNum = fromIntegral . fst . size
 

@@ -33,6 +33,13 @@ zipM ma mb = do
      b <- mb
      return $ (a, b)
 
+zipM3 :: (Monad m) => m a -> m b -> m c -> m (a, b, c)
+zipM3 ma mb mc = do
+     a <- ma
+     b <- mb
+     c <- mc
+     return $ (a, b, c)
+
 grouped :: Int -> [a] -> [[a]]
 grouped _ [] = []
 grouped n xs = let (hd, tl) = splitAt n xs in hd : grouped n tl

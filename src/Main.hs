@@ -5,6 +5,7 @@ import Options.Applicative
 
 import MainIAD1
 import MainIAD2
+import MainIAD3
 
 withInfo :: Parser a -> String -> ParserInfo a
 withInfo opts desc = info (helper <*> opts) $ progDesc desc
@@ -19,6 +20,7 @@ parser = subparser $
     <> command "NeuralGas"      (parseNeuralGas      `withInfo` "Grupowanie z gazem neuronowym")
     <> command "KMeans"         (parseKMeans         `withInfo` "Grupowanie z algorytmem k-średnich")
     <> command "Compression"    (parseCompression    `withInfo` "Kompresja obrazu")
+    <> command "RadialApprox"   (parseRadialApprox   `withInfo` "RBF - Aproksymacja")
 
 parserInfo :: ParserInfo (IO ())
 parserInfo = parser `withInfo` "Myslenie - rozwiązanie pierwszego zadania z IAD"

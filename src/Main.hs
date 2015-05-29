@@ -21,6 +21,8 @@ parser = subparser $
     <> command "KMeans"         (parseKMeans         `withInfo` "Grupowanie z algorytmem k-średnich")
     <> command "Compression"    (parseCompression    `withInfo` "Kompresja obrazu")
     <> command "RadialApprox"   (parseRadialApprox   `withInfo` "RBF - Aproksymacja")
+    <> command "RadialClass"    (parseRadialClass    `withInfo` "RBF - Klasyfikacja")
+    <> command "RadialDescentApprox" (parseRadialDescentApprox `withInfo` "RBF - Aproksymacja ze spadkiem")
 
 parserInfo :: ParserInfo (IO ())
 parserInfo = parser `withInfo` "Myslenie - rozwiązanie pierwszego zadania z IAD"

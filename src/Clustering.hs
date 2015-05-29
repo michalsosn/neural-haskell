@@ -51,6 +51,7 @@ kohonen rateWin rateNb = selfOrganizing learnKohonen
 
         gauss :: Double -> Double -> Double
         gauss b x2 = exp (- x2 / (2 * b))
+--        gauss b x2 = exp (- x2 / (2 * b * b))
 
 
 neuralGas :: forall m2 n . (KnownNat m2, KnownNat n) =>

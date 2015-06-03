@@ -5,6 +5,7 @@ module Clustering where
 import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import Data.Maybe
+import qualified Data.Set as S
 import Debug.Trace
 import GHC.TypeLits
 import qualified Numeric.LinearAlgebra.Data as D
@@ -51,7 +52,6 @@ kohonen rateWin rateNb = selfOrganizing learnKohonen
 
         gauss :: Double -> Double -> Double
         gauss b x2 = exp (- x2 / (2 * b))
---        gauss b x2 = exp (- x2 / (2 * b * b))
 
 
 neuralGas :: forall m2 n . (KnownNat m2, KnownNat n) =>
@@ -123,6 +123,19 @@ quantizationError xs os =
                 xs2 = ((xs * xs) <> (konst 1.0 :: L n 1)) <> (konst 1.0 :: L 1 m2)      :: L m1 m2
                 ds  = os2 - 2 * xos + xs2                                               :: L m1 m2
             in  ((/m) . sum . fmap (D.minElement . unwrap) . toRows) ds
+
+
+countDead :: forall m1 m2 n . (KnownNat m1, KnownNat m2, KnownNat n) =>
+             L m1 n -> L m2 n -> Int
+countDead xs os =
+    let total = fst . size $ os                                                         :: Int
+        xos = xs <> tr os                                                               :: L m1 m2
+        os2 = (konst 1.0 :: L m1 1) <> tr ((os * os) <> (konst 1.0 :: L n 1))           :: L m1 m2
+        ds  = os2 - 2 * xos                                                             :: L m1 m2
+        minIxs = (fmap (D.minIndex . unwrap) . toRows) ds                               :: [Int]
+        uniqueIxs = S.fromList minIxs                                                   :: S.Set Int
+        alive = S.size uniqueIxs                                                        :: Int
+    in  total - alive
 
 
 compressNearest :: forall m1 m2 n . (KnownNat m1, KnownNat m2, KnownNat n) =>

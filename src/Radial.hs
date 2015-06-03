@@ -30,7 +30,7 @@ gauss :: Double -> Double
 gauss x2 = exp (- x2)
 
 gaussDeriv :: Double -> Double
-gaussDeriv x2 = - 2 * (sqrt x2) * exp (- x2)
+gaussDeriv x2 = - exp (- x2)
 
 gaussPair :: (Double -> Double, Double -> Double)
 gaussPair = (gauss, gaussDeriv)
@@ -47,12 +47,14 @@ radialDescent av dv rate os rates = Feedback $ \xs ->
                 as  = ds * ((konst 1.0 :: L m 1) <> rates)                              :: L m n2
                 ys  = mmap av as                                                        :: L m n2
                 bwd bs =
-                    let core = bs * mmap dv as                                          :: L m n2
-                        bs'  = core <> os                                               :: L m n1
-                        osgrad = tr core <> ((konst (1.0/m) :: L m 1) <> (rates <> os) - xs) * 2 :: L n2 n1
+                    let osxs  = (konst (1.0/m) :: L m 1) <> (rates <> os) - xs          :: L m n1
+                        core  = bs * mmap dv as                                         :: L m n2
+                        bs'   = core <> os                                              :: L m n1
+                        osgrad = tr core <> osxs * 2                                    :: L n2 n1
                         rtgrad = (konst (1.0/m) :: L 1 m) <> (core * ds)                :: L  1 n2
-                        os'    = os + (konst rate) * osgrad                             :: L n2 n1
-                        rates' = rates + (konst rate) * rtgrad                          :: L  1 n2
+                        os'    = os - (konst rate) * osgrad                             :: L n2 n1
+                        rates' = rates - (konst rate) * rtgrad                          :: L  1 n2
+--                        fb'  = trace ("\nxs: " ++ show xs ++ "\nds: " ++ show ds ++ "\nas: " ++ show as ++ "\ncore: " ++ show core ++ "\nbs: " ++ show bs ++ "\nos: " ++ show os ++ "\nosgrad: " ++ show osgrad ++ "\nrates:" ++ show rates ++ "\nrtgrad:" ++ show rtgrad) $ radialDescent av dv rate os' rates'
                         fb'  = radialDescent av dv rate os' rates'                      :: Network m n1 n2
                     in  (fb', bs')
             in (bwd, ys)

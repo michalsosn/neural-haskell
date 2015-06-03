@@ -72,13 +72,22 @@ instance C.Category Feedback where
                              in  (fb2' `dot` fb1', a')
                 in  (bwd', c)
 
+on :: Feedback b c -> Feedback a b -> Feedback a (c, b)
+(Feedback fwd2) `on` (Feedback fwd1) = Feedback $ \a ->
+    let (bwd1, b) = fwd1 a
+        (bwd2, c) = fwd2 b
+        bwd' (c, _) = let (fb2', b') = bwd2 c
+                          (fb1', a') = bwd1 b'
+                      in  (fb2' `on` fb1', a')
+    in  (bwd', (c, b))
+
 liftFb :: (a -> b) -> (b -> a) -> Feedback a b
 liftFb f inv = Feedback $ \a -> (\b -> (liftFb f inv, inv b), f a)
 
 close :: Feedback a b -> Circuit (a, b -> b) b
 close fb@(Feedback fwd) = Circuit $ \(a, ts) ->
     let (bwd, b) = fwd a
-        fb' = (fst . bwd) (ts b)
+        (fb', _) = bwd $ ts b
     in (close fb', b)
 
 train :: a -> (b -> b) -> State (Feedback a b) b

@@ -286,14 +286,15 @@ parseRadialClass = solveRadialClass
 
 
 makeRadialDescentApprox :: forall g m ml . (RandomGen g, KnownNat ml, KnownNat m) =>
-                     Double -> Double -> Double -> L ml 1 -> g -> State [Double] (Network m 1 1)
+                     Double -> Double -> Double -> L ml 1 -> g ->
+                     State [Double] (Network m 1 1)
 makeRadialDescentApprox rate1 rate2 mom2 xsl gen = do
     let os1 = takeSample xsl gen
         rates1 = konst 0.5
     os2 <- takeMatrix
-    let l1  = uncurry radialDescent gaussPair rate1 os1 rates1               :: Network m 1 10
-        l2  = uncurry neuralLayer   R.idPair  (const rate2) (const mom2) os2 :: Network m 10 1
-    return $ l1 >>> l2
+    let l1  = uncurry radialDescent gaussPair rate1 os1 rates1               :: Network m 1 4
+        l2  = uncurry neuralLayer   R.idPair  (const rate2) (const mom2) os2 :: Network m 5 1
+    return $ l1 >>> bias >>> l2
 
 solveRadialDescentApprox :: Bool -> Double -> Double -> Double -> Int -> Double -> IO ()
 solveRadialDescentApprox alt = if not alt
@@ -302,7 +303,8 @@ solveRadialDescentApprox alt = if not alt
     where
         aux :: forall m . (KnownNat m) => String -> Proxy m -> Double -> Double -> Double -> Int -> Double -> IO ()
         aux path _proxy rate1 rate2 mom2 epochs initRange = do
-            gen <- getStdGen
+--            gen <- getStdGen
+            let gen = mkStdGen 50
             pst <- readMatrix "test/approximation_test.txt" :: IO (L 1000 2)
             psl <- readMatrix path :: IO (L m 2)
 
@@ -329,7 +331,7 @@ parseRadialDescentApprox :: Parser (IO ())
 parseRadialDescentApprox = solveRadialDescentApprox
     <$> switch      (short 'a' <> long "alt"
                     <> help "Use an alternative data set in text/approximation_train_2.txt.")
-    <*> option auto (short 'r' <> long "rate1" <> value 0.00 <> showDefault
+    <*> option auto (short 'r' <> long "rate1" <> value 0.001 <> showDefault
                     <> help "Learning rate of the radial layer.")
     <*> option auto (short 'R' <> long "rate2" <> value 0.01 <> showDefault
                     <> help "Learning rate of the neurons in the output layer.")
@@ -339,3 +341,114 @@ parseRadialDescentApprox = solveRadialDescentApprox
                     <> help "Number of epochs of training the network will go through.")
     <*> option auto (short 'I' <> long "initRange" <> value 1.0 <> showDefault
                     <> help "The neurons will be initialized with values from (-I, I).")
+
+makeRadialDescentClass :: forall m n ml g . (KnownNat m, KnownNat n, KnownNat ml, RandomGen g) =>
+                      Double -> Double -> Double -> L ml n -> g ->
+                      State [Double] (Network m n 3)
+makeRadialDescentClass rate1 rate2 mom2 xsl gen = do
+    let os1 = takeSample xsl gen
+        rates1 = konst 0.5
+    os2 <- takeMatrix
+    let l1  = uncurry radialDescent gaussPair rate1 os1 rates1                 :: Network m n 10
+        l2  = uncurry neuralLayer R.sigmoidPair (const rate2) (const mom2) os2 :: Network m 11 3
+    return $ l1 >>> bias >>> l2
+
+solveRadialDescentClass :: [Bool] -> Double -> Double -> Double -> Int -> Double -> IO ()
+solveRadialDescentClass chosen =
+    case length $ filter id chosen of
+        0 -> aux chosen (Proxy :: Proxy 0)
+        1 -> aux chosen (Proxy :: Proxy 1)
+        2 -> aux chosen (Proxy :: Proxy 2)
+        3 -> aux chosen (Proxy :: Proxy 3)
+        4 -> aux chosen (Proxy :: Proxy 4)
+    where
+        aux :: forall n . (KnownNat n) =>
+               [Bool] -> Proxy n -> Double -> Double -> Double -> Int -> Double -> IO ()
+        aux chosen _proxy rate1 rate2 mom2 epochs initRange = do
+            (gen1:gen2:_) <- fmap splits getStdGen
+            ps1 <- readMatrix "test/classification_train.txt" :: IO (L 90 5)
+            pst <- readMatrix "test/classification_test.txt"  :: IO (L 93 5)
+
+            let (xsl', cs1) = separateYs ps1 :: (L 90 4, L 90 1)
+                xsl = dropChosen chosen xsl' :: L 90 n
+                (xst', cst) = separateYs pst :: (L 93 4, L 93 1)
+                xst = dropChosen chosen xst' :: L 93 n
+                ys1 = classesToMatrix cs1 :: L 90 3
+                yst = classesToMatrix cst :: L 93 3
+
+            let network = evalState (makeRadialDescentClass rate1 rate2 mom2 xsl gen1) (randomInit initRange gen2)
+                ((resLs, resTs), trained) = runState ((fmap unzip . replicateM epochs) (trainEpoch ys1 xsl >> zipM (predictInRows xsl) (predictInRows xst))) network
+                resLsCls = fmap matrixToClasses resLs
+                resTsCls = fmap matrixToClasses resTs
+
+--            print $ takeNth 10 resLs
+--            print $ takeNth 10 resLsCls
+            print $ last resTs
+            print $ last resTsCls
+            print $ cst
+
+            let toPoints :: (KnownNat kot, KnownNat pies) => L kot pies -> [(Double, Double)]
+                toPoints = fmap (\(i, row) -> (takePoint . (++[i]) . D.toList . unwrap) row) . zip [1 * x | x <- [1..]] . toRows
+
+                takePoint :: [Double] -> (Double, Double)
+                takePoint (a:b:_) = (a, b)
+                takePoint [a] = (a, 0.0)
+                ixses = toPoints xst
+
+                filterBro :: (b -> Bool) -> [a] -> [b] -> [a]
+                filterBro f (a:as) (b:bs) = if f b then a : filterBro f as bs else filterBro f as bs
+                filterBro _ [] [] = []
+
+                [ones, twos, thrs] = (\n -> filterBro (==n) ixses (toList1 $ last resTsCls)) <$> [1.0, 2.0, 3.0]
+                [wones, wtwos, wthrs] = (\n -> filterBro (==n) ixses (toList1 cst)) <$> [1.0, 2.0, 3.0]
+
+                showBools = concat . fmap (\b -> if b then "1" else "0")
+
+            void $ plot X11
+                [ Data2D     [Title "Ones", Style Points, Color Red  ]  [] ones
+                , Data2D     [Title "Twos", Style Points, Color Green]  [] twos
+                , Data2D     [Title "Threes", Style Points, Color Blue ]  [] thrs
+                ]
+
+            void $ plot X11
+                [ Data2D     [Title "Correct Ones", Style Points, Color Red  ]  [] wones
+                , Data2D     [Title "Correct Twos", Style Points, Color Green]  [] wtwos
+                , Data2D     [Title "Correct Threes", Style Points, Color Blue ]  [] wthrs
+                ]
+
+            void $ plot X11
+                [ Data2D [Title "Mean squared error - training set", Style Lines] [] $ zip [1..]  (fmap (meanSquaredError ys1) resLs)
+                , Data2D [Title "Mean squared error - test set",     Style Lines] [] $ zip [1..]  (fmap (meanSquaredError yst) resTs)
+                ]
+
+            void $ plot X11
+                [ Data2D [Title "Precision - training set", Style Lines] [] $ zip [1..]  (fmap (precision cs1) resLsCls)
+                , Data2D [Title "Precision - test set",     Style Lines] [] $ zip [1..]  (fmap (precision cst) resTsCls)
+                ]
+
+
+parseRadialDescentClass :: Parser (IO ())
+parseRadialDescentClass = solveRadialDescentClass
+    <$> (fmap parseFeatures . strOption)
+                    (short 'f' <> long "features" <> value "1111" <> showDefault
+                    <> help "A string of four 0s and 1s denoting which features to use.")
+    <*> option auto (short 'r' <> long "rate1" <> value 0.001 <> showDefault
+                    <> help "Learning rate of the neurons of the radial layer.")
+    <*> option auto (short 'R' <> long "rate2" <> value 0.3 <> showDefault
+                    <> help "Learning rate of the neurons of the output layer.")
+    <*> option auto (short 'M' <> long "momentum2" <> value 0.0 <> showDefault
+                    <> help "Momentum of the neurons of the output layer.")
+    <*> option auto (short 'e' <> long "epochs" <> value 100 <> showDefault
+                    <> help "Number of epochs of training the network will go through.")
+    <*> option auto (short 'I' <> long "initRange" <> value 1.0 <> showDefault
+                    <> help "The neurons will be initialized with values from (-I, I).")
+    where
+        digitToBool :: Char -> Bool
+        digitToBool '0' = False
+        digitToBool '1' = True
+        digitToBool s = error $ "Expected 0 or 1, got: " ++ [s]
+
+        parseFeatures :: String -> [Bool]
+        parseFeatures s = if length s < 5
+                          then fmap digitToBool s
+                          else error $ "Expected a string with length < 5, got: " ++ s

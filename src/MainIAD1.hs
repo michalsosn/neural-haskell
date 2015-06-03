@@ -79,8 +79,8 @@ makeTransformation rate1 mom1 rate2 mom2 = do
 
 solveTransformation :: Double -> Double -> Double -> Double -> Int -> Double -> IO ()
 solveTransformation rate1 mom1 rate2 mom2 epochs initRange = do
---    gen <- getStdGen
-    let gen = mkStdGen 50
+    gen <- getStdGen
+--    let gen = mkStdGen 50
     xs <- readMatrix "test/transformation.txt" :: IO (L 4 4)
 
     let network = evalState (makeTransformation rate1 mom1 rate2 mom2 ) (randomInit initRange gen)

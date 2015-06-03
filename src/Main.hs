@@ -23,6 +23,7 @@ parser = subparser $
     <> command "RadialApprox"   (parseRadialApprox   `withInfo` "RBF - Aproksymacja")
     <> command "RadialClass"    (parseRadialClass    `withInfo` "RBF - Klasyfikacja")
     <> command "RadialDescentApprox" (parseRadialDescentApprox `withInfo` "RBF - Aproksymacja ze spadkiem")
+    <> command "RadialDescentClass"  (parseRadialDescentClass  `withInfo` "RBF - Klasyfikacja ze spadkiem")
 
 parserInfo :: ParserInfo (IO ())
 parserInfo = parser `withInfo` "Myslenie - rozwiązanie pierwszego zadania z IAD"

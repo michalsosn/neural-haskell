@@ -26,11 +26,11 @@ import LinearUtils
 import Neural
 import RandomInit
 
-type NetSize = 100
+type NetSize = 50
 
 makeKohonen :: (KnownNat m) =>
                Double -> Double -> Double -> Double -> Double -> L m 2 ->
-               State [Double] (Circuit (L 1 2) ([Double], [[Graph2D Double Double]]))
+               State [Double] (Circuit (L 1 2) ([Double], [Int], [[Graph2D Double Double]]))
 makeKohonen rateWinS rateWinE rateNbS rateNbE iters xss = do
     os <- takeMatrix
     let (scale, descale) = scaleFeatures xss
@@ -43,8 +43,9 @@ makeKohonen rateWinS rateWinE rateNbS rateNbE iters xss = do
         os  <- arr (rmap descale) -< sOs
         it  <- total -< 1
         error <- logger (quantizationError xss) -< os
+        dead  <- logger (countDead xss)         -< os
         plots <- logger plotNeurons             -< (it, xs, os)
-        returnA -< (error, plots)
+        returnA -< (error, dead, plots)
     where
         plotNeurons :: (KnownNat m) => (Int, L 1 2, L m 2) -> [Graph2D Double Double]
         plotNeurons (it, xs, os) =
@@ -63,7 +64,10 @@ solveKohonen rateWinS rateWinE rateNbS rateNbE epochs size initRange = do
 
 --    let shape = evalState (takeCross (size / 4.0)) (randomInit size gen1)            :: L 500 2
 --        shape = evalState (takeCircle 0.5 0.5 1.5) (randomInit size gen1)              :: L 500 2
-    let shape = evalState (takeThreeCircles size) (randomInit size gen1)               :: L 500 2
+--    let shape = evalState (takeThreeCircles size) (randomInit size gen1)               :: L 500 2
+--    let shape = rmap (+(vector [3*size, -1*size] :: R 2)) $ evalState (takeRect (size) (size/10)) (randomInit size gen1) :: L 500 2
+    let shape = evalState (takeDense 0.0 0.0 0.5 2 size) (randomInit size gen1)        :: L 500 2
+--    let shape = evalState (takeOpposite size size) (randomInit size gen1)              :: L 500 2
 --    let shape = evalState (takeWeird size) (randomInit size gen1)                      :: L 500 2
 --        shape = evalState (takeCuboid [1.0, 2.0, 5.0]) (randomInit size gen1)          :: L 2000 3
 --        shape = evalState (takeEuclidean [1.0, 1.0, 0.0] 3.0) (randomInit size gen1)   :: L 1000 3
@@ -71,17 +75,20 @@ solveKohonen rateWinS rateWinE rateNbS rateNbE epochs size initRange = do
 
     let iters = fromIntegral epochs * rowNum shape
         network = evalState (makeKohonen rateWinS rateWinE rateNbS rateNbE iters shape) (randomInit initRange gen2)
-        (errors, nplots) = evalState (fmap (last . concat) $ replicateM epochs $ forM (toRowMs shape) run) network
+        (errors, dead, nplots) = evalState (fmap (last . concat) $ replicateM epochs $ forM (toRowMs shape) run) network
 
     let dataPlot = Data2D [Title $ "Data", Style Points, Color Green] [] $ toPoints shape
 --        dataPlot = Data3D [Title $ "Data", Style Points, Color Green] [] $ toPoints3D shape
         plots = fmap (dataPlot:) nplots
 
     printf "%.4f" $ last errors
-    void $ plot (PNG $ "kohonen-error.png") $
-                Data2D [Title "Quantization error", Style Lines] [] $ zip [1..] errors
-    void $ plot (PNG $ "kohonen-final.png") $
-                last plots
+    printf " %d" $ last dead
+--    void $ plot (PNG $ "kohonen-error.png") $
+--                Data2D [Title "Quantization error", Style Lines] [] $ zip [1..] errors
+--    void $ plot (PNG $ "kohonen-dead.png") $
+--                Data2D [Title "Inactive count", Style Lines] [] $ zip [1..] dead
+--    void $ plot (PNG $ "kohonen-final.png") $
+--                last plots
 --    animatePlots "kohonen.gif" 3 plots
 
 parseKohonen :: Parser (IO ())
@@ -103,7 +110,7 @@ parseKohonen = solveKohonen
 
 makeNeuralGas :: (KnownNat m) =>
                Double -> Double -> Double -> Double -> Double -> L m 2 ->
-               State [Double] (Circuit (L 1 2) ([Double], [[Graph2D Double Double]]))
+               State [Double] (Circuit (L 1 2) ([Double], [Int], [[Graph2D Double Double]]))
 makeNeuralGas rateWinS rateWinE rateNbS rateNbE iters xss = do
     os <- takeMatrix
     let (scale, descale) = scaleFeatures xss
@@ -114,8 +121,9 @@ makeNeuralGas rateWinS rateWinE rateNbS rateNbE iters xss = do
         os  <- arr (rmap descale) -< sOs
         it  <- total -< 1
         error <- logger (quantizationError xss) -< os
+        dead  <- logger (countDead xss)         -< os
         plots <- logger plotNeurons             -< (it, xs, os)
-        returnA -< (error, plots)
+        returnA -< (error, dead, plots)
     where
         plotNeurons :: (KnownNat m) => (Int, L 1 2, L m 2) -> [Graph2D Double Double]
         plotNeurons (it, xs, os) =
@@ -128,19 +136,25 @@ solveNeuralGas rateWinS rateWinE rateNbS rateNbE epochs size initRange = do
     (gen1:gen2:_) <- fmap splits getStdGen
 
 --    let shape = evalState (takeCross (size / 4.0)) (randomInit size gen1)            :: L 500 2
-    let shape = evalState (takeThreeCircles size) (randomInit size gen1)               :: L 500 2
+--    let shape = evalState (takeThreeCircles size) (randomInit size gen1)               :: L 500 2
 --    let shape = evalState (takeWeird size) (randomInit size gen1)                      :: L 500 2
+--    let shape = rmap (+(vector [3*size, -1*size] :: R 2)) $ evalState (takeRect (size) (size/10)) (randomInit size gen1) :: L 500 2
+--    let shape = evalState (takeOpposite size size) (randomInit size gen1)              :: L 500 2
+    let shape = evalState (takeDense 0.0 0.0 0.5 2 size) (randomInit size gen1)        :: L 500 2
 
     let iters = fromIntegral epochs * rowNum shape
         network = evalState (makeNeuralGas rateWinS rateWinE rateNbS rateNbE iters shape) (randomInit initRange gen2)
-        (errors, nplots) = evalState (fmap (last . concat) $ replicateM epochs $ forM (toRowMs shape) run) network
+        (errors, dead, nplots) = evalState (fmap (last . concat) $ replicateM epochs $ forM (toRowMs shape) run) network
 
     let dataPlot = Data2D [Title $ "Data", Style Points, Color Green] [] $ toPoints shape
         plots = fmap (dataPlot:) nplots
 
     printf "%.4f" $ last errors
+    printf " %d" $ last dead
     void $ plot (PNG $ "gas-error.png") $
                 Data2D [Title "Quantization error", Style Lines] [] $ zip [1..] errors
+    void $ plot (PNG $ "gas-dead.png") $
+                Data2D [Title "Inactive count", Style Lines] [] $ zip [1..] dead
     void $ plot (PNG $ "gas-final.png") $
                 last plots
 --    animatePlots "neuralGas.gif" 3 plots
@@ -164,15 +178,16 @@ parseNeuralGas = solveNeuralGas
 
 makeKMeans :: forall g m1 . (RandomGen g, KnownNat m1) =>
               L m1 2 -> g ->
-              Circuit (L m1 2) ([Double], [[Graph2D Double Double]])
+              Circuit (L m1 2) ([Double], [Int], [[Graph2D Double Double]])
 makeKMeans xss gen = proc xs -> do
     sXs <- arr (rmap scale)   -< xs
     sOs <- network            -< sXs
     os  <- arr (rmap descale) -< sOs
     it  <- total -< 1
     error <- logger (quantizationError xss) -< os
+    dead  <- logger (countDead xss)         -< os
     plots <- logger plotNeurons -< (it, os)
-    returnA -< (error, plots)
+    returnA -< (error, dead, plots)
     where
         (scale, descale) = scaleFeatures xss
         ios = takeSample (rmap scale xss) gen
@@ -188,18 +203,24 @@ solveKMeans epochs size = do
     (gen1:gen2:_) <- fmap splits getStdGen
 
 --    let shape = evalState (takeCross (size / 4.0)) (randomInit size gen1)            :: L 500 2
-    let shape = evalState (takeThreeCircles size) (randomInit size gen1)               :: L 500 2
+--    let shape = evalState (takeThreeCircles size) (randomInit size gen1)               :: L 500 2
 --    let shape = evalState (takeWeird size) (randomInit size gen1)                      :: L 500 2
+--    let shape = rmap (+(vector [3*size, -1*size] :: R 2)) $ evalState (takeRect (size) (size/10)) (randomInit size gen1) :: L 500 2
+--    let shape = evalState (takeOpposite size size) (randomInit size gen1)              :: L 500 2
+    let shape = evalState (takeDense 0.0 0.0 0.5 2 size) (randomInit size gen1)        :: L 500 2
 
     let network = makeKMeans shape gen2
-        (errors, nplots) = evalState (fmap last $ replicateM epochs $ run shape) network
+        (errors, dead, nplots) = evalState (fmap last $ replicateM epochs $ run shape) network
 
     let dataPlot = Data2D [Title $ "Data", Style Points, Color Green] [] $ toPoints shape
         plots = fmap (dataPlot:) nplots
 
     printf "%.4f" $ last errors
+    printf " %d" $ last dead
     void $ plot (PNG $ "kMeans-error.png") $
                 Data2D [Title "Quantization error", Style Lines] [] $ zip [1..] errors
+    void $ plot (PNG $ "kMeans-dead.png") $
+                Data2D [Title "Inactive count", Style Lines] [] $ zip [1..] dead
     void $ plot (PNG $ "kMeans-final.png") $
                 last plots
 --    void $ plot X11 $ Data2D [Title "Quantization error", Style Lines] [] $ zip [1..] errors
@@ -215,24 +236,54 @@ parseKMeans = solveKMeans
 
 makeCompression :: forall m n . (KnownNat m, KnownNat n) =>
                    Double -> Double -> Double -> Double -> Double -> L m n ->
-                   State [Double] (Circuit (L 1 n) (L m n, [Double], [Double]))
+                   State [Double] (Circuit (L 1 n) (Double, Double, Int))
 makeCompression rateWinS rateWinE rateNbS rateNbE iters xss = do
     ios <- takeMatrix
 
     let (scale, descale) = scaleFeatures xss
---        network = kohonen (rateFunc rateWinS rateWinE iters) (rateFunc rateNbS rateNbE iters) ios :: Network' 1 400 n
---        network = neuralGas (rateFunc rateWinS rateWinE iters) (rateFunc rateNbS rateNbE iters) ios :: Network' 1 400 n
-        network = kMeans ios :: Network' 1 400 n
+        network = kohonen (rateFunc rateWinS rateWinE iters) (rateFunc rateNbS rateNbE iters) ios :: Network' 1 200 n
+--        network = neuralGas (rateFunc rateWinS rateWinE iters) (rateFunc rateNbS rateNbE iters) ios :: Network' 1 20 n
+--        network = kMeans ios :: Network' 1 400 n
 
     return $ proc xs -> do
         sXs <- arr (rmap scale)   -< xs
         sOs <- network            -< sXs
         os  <- arr (rmap descale) -< sOs
 
-        nearest <- arr (compressNearest xss)               -< os
-        error   <- logger (quantizationError xss)          -< os
-        psnr    <- logger (peakSignalToNoiseRatio 255 xss) -< nearest
-        returnA -< (nearest, error, psnr)
+        nearest <- arr (compressNearest xss)            -< os
+        error   <- arr (quantizationError xss)          -< os
+        psnr    <- arr (peakSignalToNoiseRatio 255 xss) -< nearest
+        dead    <- arr (countDead xss)                  -< os
+        returnA -< (error, psnr, dead)
+
+--doMinCompression :: IO ()
+--doMinCompression = do
+--    features <- loadImage
+--
+--    results <- sequence $ do
+--        wbeg <- wbegs
+--        wend <- wends
+--        nbeg <- nbegs
+--        nend <- nends
+--        return $ aux features wbeg wend nbeg nend
+--
+--    let minError = L.minimumBy leastError results
+--        minPsnr = L.minimumBy leastPsnr results
+--
+--    putStrLn $ showTuple minError ++ "&" ++ showTuple minPsnr
+--    where
+--        wbegs = [0.05, 0.1, 0.5, 1.0]
+--        wends = [0.01, 0.005, 0.001]
+--        nbegs = [0.05, 0.01, 0.005, 0.001]
+--        nends = [0.001, 0.00001]
+--        aux :: (KnownNat m, KnownNat n) => L m n -> Double -> Double -> Double -> Double ->
+--               IO (Double, Double, Double, Double, Double, Double, Int)
+--        aux features wbeg wend nbeg nend = do
+--            (error, psnr, dead) <- solveCompression wbeg wend nbeg nend 5 0.5 features
+--            return (wbeg, wend, nbeg, nend, error, psnr, dead)
+--        leastError (_, _, _, _, errora, _, _) (_, _, _, _, errorb, _, _) = compare errora errorb
+--        leastPsnr (_, _, _, _, _, psnra, _) (_, _, _, _, _, psnrb, _) = compare psnra psnrb
+--        showTuple (a, b, c, d, e, f, g) = printf "%f" a ++ "-" ++ printf "%f" b ++ "&" ++ printf "%f" c ++ "-" ++ printf "%f" d ++ "&" ++ printf "%.4f&" e ++ printf "%.4f&" f ++ show g
 
 makeCompression' :: forall g m1 n . (RandomGen g, KnownNat m1, KnownNat n) =>
                    L m1 n -> g ->
@@ -251,67 +302,68 @@ makeCompression' xss gen = proc xs -> do
         ios = takeSample (rmap scale xss) gen
         network = kMeans ios :: Network' m1 120 n
 
-type Frame = [[PixelRGB8]]
---type Frame = [[Pixel8]]
+--type Frame = [[PixelRGB8]]
+type Frame = [[Pixel8]]
 
 solveCompression :: Double -> Double -> Double -> Double -> Int -> Double -> IO ()
 solveCompression rateWinS rateWinE rateNbS rateNbE epochs initRange = do
     gen <- getStdGen
 
-    file <- B.readFile "smieszny-piesek.png"
+    file <- B.readFile "smieszny-piesek-bw.png"
     let Right png = decodePng file
-        ImageRGB8 img = png
---        ImageY8 img = png
+--        ImageRGB8 img = png
+        ImageY8 img = png
         w = imageWidth img
         h = imageHeight img
 
         pixels = [[pixelAt img x y | x <- [0..w-1]] | y <- [0..h-1]]
         frames = splitFrames 4 4 pixels                                   :: [[Frame]]
 --        features = fromRows . join . (fmap . fmap) frameToFeatures $ frames :: L 1600 27
-        features = fromRows . join . (fmap . fmap) frameToFeatures $ frames :: L 900 48
+--        features = fromRows . join . (fmap . fmap) frameToFeatures $ frames :: L 900 48
 --        features = fromRows . join . (fmap . fmap) frameToFeatures $ frames :: L 1600 9
---        features = fromRows . join . (fmap . fmap) frameToFeatures $ frames :: L 900 16
+        features = fromRows . join . (fmap . fmap) frameToFeatures $ frames :: L 900 16
 
     let iters = fromIntegral epochs * rowNum features
-        network = makeCompression' features gen
-        (features', errors, psnrs) = evalState (fmap last $ replicateM epochs $ run features) network
---        network = evalState (makeCompression rateWinS rateWinE rateNbS rateNbE iters features) $ randomInit initRange gen
---        (features', errors, psnrs) = evalState (fmap (last . concat) $ replicateM epochs $ forM (toRowMs features) run) network
+--        network = makeCompression' features gen
+--        (features', errors, psnrs) = evalState (fmap last $ replicateM epochs $ run features) network
+        network = evalState (makeCompression rateWinS rateWinE rateNbS rateNbE iters features) $ randomInit initRange gen
+        (errors, psnrs, dead) = evalState (fmap (last . concat) $ replicateM epochs $ forM (toRowMs features) run) network
 
         -- 40 = sqrt 1600 czyli liczby cech, 30 = sqrt 900
-        frames' = (fmap . fmap) featuresToFrame . grouped 30 . toRows $ features'
-        pixels' = joinFrames frames'
+--        frames' = (fmap . fmap) featuresToFrame . grouped 30 . toRows $ features'
+--        pixels' = joinFrames frames'
 
-    printf "%.4f\n" $ last errors
-    printf "%.4f\n" $ last psnrs
-    void $ plot (PNG $ "compression-error.png") $
-                Data2D [Title "Quantization error", Style Lines] [] $ zip [1..] errors -- $ takeNth 25 errors
-    void $ plot (PNG $ "compression-psnrs.png") $
-                Data2D [Title "Peak signal to noise ratio", Style Lines] [] $ zip [1..] psnrs -- $ takeNth 25 psnrs
+--    printf "%.4f\n" $ last errors
+--    printf "%.4f\n" $ last psnrs
+--    void $ plot (PNG $ "compression-error.png") $
+--                Data2D [Title "Quantization error", Style Lines] [] $ zip [1..] errors -- $ takeNth 25 errors
+--    void $ plot (PNG $ "compression-psnrs.png") $
+--                Data2D [Title "Peak signal to noise ratio", Style Lines] [] $ zip [1..] psnrs -- $ takeNth 25 psnrs
 
-    let img' = snd $ generateFoldImage imageFromLists pixels' w h
-    savePngImage "smieszna-kompresja.png" $ ImageRGB8 img'
+--    let img' = snd $ generateFoldImage imageFromLists pixels' w h
+--    savePngImage "smieszna-kompresja.png" $ ImageRGB8 img'
 --    savePngImage "smieszna-kompresja.png" $ ImageY8 img'
-
+--    return (errors, psnrs, dead)
+    putStrLn $ printf "%f" rateWinS ++ "-" ++ printf "%f" rateWinE ++ "&" ++ printf "%f" rateNbS ++ "-" ++ printf "%f" rateNbE ++ "&" ++ printf "%.4f&" errors ++ printf "%.4f&" psnrs ++ show dead
     where
         frameToFeatures :: (KnownNat n) => Frame -> R n
         frameToFeatures xss = vector $ do
             xs <- xss
-            PixelRGB8 r g b <- xs
-            fmap fromIntegral [r, g, b]
---            fmap fromIntegral xs
-
-        featuresToFrame :: (KnownNat n) => R n -> Frame
-        featuresToFrame ps = grouped (round . sqrt . fromIntegral $ size ps `div` 3) . fmap makePixel . grouped 3 . D.toList . unwrap $ ps
-            where
-                makePixel [r, g, b] = PixelRGB8 (round r) (round g) (round b)
---        featuresToFrame :: (KnownNat n) => R n -> Frame
---        featuresToFrame ps = grouped (round . sqrt . fromIntegral $ size ps) . fmap makePixel . grouped 1 . D.toList . unwrap $ ps
---            where
---                makePixel [v] = round v
+--            PixelRGB8 r g b <- xs
+--            fmap fromIntegral [r, g, b]
+            fmap fromIntegral xs
 
         splitFrames :: Int -> Int -> [[a]] -> [[[[a]]]]
         splitFrames w h = fmap L.transpose . grouped h . fmap (grouped w)
+
+--        featuresToFrame :: (KnownNat n) => R n -> Frame
+--        featuresToFrame ps = grouped (round . sqrt . fromIntegral $ size ps `div` 3) . fmap makePixel . grouped 3 . D.toList . unwrap $ ps
+--            where
+--                makePixel [r, g, b] = PixelRGB8 (round r) (round g) (round b)
+        featuresToFrame :: (KnownNat n) => R n -> Frame
+        featuresToFrame ps = grouped (round . sqrt . fromIntegral $ size ps) . fmap makePixel . grouped 1 . D.toList . unwrap $ ps
+            where
+                makePixel [v] = round v
 
         joinFrames :: [[[[a]]]] -> [[a]]
         joinFrames = fmap join . join . fmap L.transpose
@@ -334,3 +386,4 @@ parseCompression = solveCompression
                     <> help "Number of epochs of training the network will go through.")
     <*> option auto (short 'I' <> long "initRange" <> value 0.5 <> showDefault
                     <> help "The neurons will be initialized with values from (-I, I).")
+

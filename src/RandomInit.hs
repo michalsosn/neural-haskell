@@ -75,6 +75,11 @@ cutCuboid ds = composeAll $ fmap cut $ zipWith (:) ds (eye dim)
         composeAll [] = id
         composeAll (f:fs) = composeAll fs . f
 
+translate :: [Double] -> [Double] -> [Double]
+translate ws = zipWith (+) (cycle ws)
+
+scale :: [Double] -> [Double] -> [Double]
+scale ws = zipWith (*) (cycle ws)
 
 union :: Int -> [[Double] -> [Double]] -> [Double] -> [Double]
 union dim cuts xs = if all (null . ($hs)) cuts
@@ -84,11 +89,15 @@ union dim cuts xs = if all (null . ($hs)) cuts
         (hs, ts) = splitAt dim xs
         rest = union dim cuts ts
 
-translate :: [Double] -> [Double] -> [Double]
-translate ws = zipWith (+) (cycle ws)
+invert :: Int -> ([Double] -> [Double]) -> [Double] -> [Double]
+invert dim f xs = if (null . f) hs then hs ++ invert dim f ts else invert dim f ts
+    where
+        (hs, ts) = splitAt dim xs
 
-scale :: [Double] -> [Double] -> [Double]
-scale ws = zipWith (*) (cycle ws)
+alternately :: Int -> [[Double] -> [Double]] -> [Double] -> [Double]
+alternately dim (f:fs) xs = f hs ++ alternately dim (fs ++ [f]) ts
+    where
+        (hs, ts) = splitAt dim xs
 
 takeTriangle :: forall m . (KnownNat m) => Double -> State [Double] (L m 2)
 takeTriangle size = do
@@ -140,6 +149,40 @@ takeThreeCircles s = do
     modify $ translate $ repeat (-0.5 * s)
     took <- state $ splitAt (m * 2)
     return $ matrix took
+
+takeOpposite :: forall m . (KnownNat m) => Double -> Double -> State [Double] (L m 2)
+takeOpposite h w = do
+    let m = fromIntegral . natVal $ (Proxy :: Proxy m) :: Int
+    modify $ union 2 [ cut [w/8.0,  1.0,  0.0]
+                     . cut [w/8.0, -1.0,  0.0]
+                     . cut [h/2.0,  0.0,  1.0]
+                     . cut [h/2.0,  0.0, -1.0]
+                     . translate [-w*0.75, 0.0]
+                     , cut [w/8.0,  1.0,  0.0]
+                     . cut [w/8.0, -1.0,  0.0]
+                     . cut [h/2.0,  0.0,  1.0]
+                     . cut [h/2.0,  0.0, -1.0]
+                     . translate [w*0.75, 0.0]
+                     ]
+    took <- state $ splitAt (m * 2)
+    return $ matrix took
+
+takeDense :: forall m . (KnownNat m) => Double -> Double -> Double -> Int -> Double -> State [Double] (L m 2)
+takeDense x y drop drops size = fmap matrix $ aux size (2 * m)
+    where
+        m = fromIntegral . natVal $ (Proxy :: Proxy m) :: Int
+        mPart = (2 * m) `div` (drops + 1)
+
+        aux :: Double -> Int -> State [Double] [Double]
+        aux range toTake
+            | toTake >= mPart = do
+                modify $ cutEuclidean [x, y] range
+                part <- state $ splitAt mPart
+                rest <- aux (range * drop) (toTake - mPart)
+                return $ part ++ rest
+            | otherwise = do
+                modify $ cutEuclidean [x, y] range
+                state $ splitAt toTake
 
 takeWeird :: forall m . (KnownNat m) => Double -> State [Double] (L m 2)
 takeWeird s = do

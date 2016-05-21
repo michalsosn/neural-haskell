@@ -12,21 +12,21 @@ withInfo opts desc = info (helper <*> opts) $ progDesc desc
 
 parser :: Parser (IO ())
 parser = subparser $
-       command "Labs"           (parseLinear         `withInfo` "Klasyfikacja z laboratorium")
-    <> command "Transformation" (parseTransformation `withInfo` "Transformacja")
-    <> command "Approximation"  (parseApproximation  `withInfo` "Aproksymacja")
-    <> command "Classification" (parseClassification `withInfo` "Klasyfikacja z trzema klasami")
-    <> command "Kohonen"        (parseKohonen        `withInfo` "Grupowanie z siecią Kohenena")
-    <> command "NeuralGas"      (parseNeuralGas      `withInfo` "Grupowanie z gazem neuronowym")
-    <> command "KMeans"         (parseKMeans         `withInfo` "Grupowanie z algorytmem k-średnich")
-    <> command "Compression"    (parseCompression    `withInfo` "Kompresja obrazu")
-    <> command "RadialApprox"   (parseRadialApprox   `withInfo` "RBF - Aproksymacja")
-    <> command "RadialClass"    (parseRadialClass    `withInfo` "RBF - Klasyfikacja")
-    <> command "RadialDescentApprox" (parseRadialDescentApprox `withInfo` "RBF - Aproksymacja ze spadkiem")
-    <> command "RadialDescentClass"  (parseRadialDescentClass  `withInfo` "RBF - Klasyfikacja ze spadkiem")
+       command "Labs"           (parseLinear         `withInfo` "Dummy classification")
+    <> command "Transformation" (parseTransformation `withInfo` "Transformation")
+    <> command "Approximation"  (parseApproximation  `withInfo` "Approximation")
+    <> command "Classification" (parseClassification `withInfo` "Classification with three classes")
+    <> command "Kohonen"        (parseKohonen        `withInfo` "Kohenen network clustering")
+    <> command "NeuralGas"      (parseNeuralGas      `withInfo` "Neural gas clustering")
+    <> command "KMeans"         (parseKMeans         `withInfo` "K-mean clustering")
+    <> command "Compression"    (parseCompression    `withInfo` "Image compression")
+    <> command "RadialApprox"   (parseRadialApprox   `withInfo` "Approximation with RBF")
+    <> command "RadialClass"    (parseRadialClass    `withInfo` "Classification with RBF")
+    <> command "RadialDescentApprox" (parseRadialDescentApprox `withInfo` "Approximation with RBF (descent version)")
+    <> command "RadialDescentClass"  (parseRadialDescentClass  `withInfo` "Classification with RBF (descent version)")
 
 parserInfo :: ParserInfo (IO ())
-parserInfo = parser `withInfo` "Myslenie - rozwiązanie pierwszego zadania z IAD"
+parserInfo = parser `withInfo` "Myslenie - neural networks in Haskell"
 
 main :: IO ()
 main = join $ execParser parserInfo

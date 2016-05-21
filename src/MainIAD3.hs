@@ -255,8 +255,6 @@ solveRadialClass chosen =
                 [ones, twos, thrs] = (\n -> filterBro (==n) ixses (toList1 resTsCls)) <$> [1.0, 2.0, 3.0]
                 [wones, wtwos, wthrs] = (\n -> filterBro (==n) ixses (toList1 cst)) <$> [1.0, 2.0, 3.0]
 
-                showBools = concat . fmap (\b -> if b then "1" else "0")
-
             void $ plot (PNG $ printf "radial-class-quantization-%f-%f-%f-%fto%f-%fto%f-%d-%d-%f.png" scale rate mom rateWinS rateWinE rateNbS rateNbE epochs1 epochs2 initRange) $
                 Data2D [Title "Quantization error", Style Lines] [] $ zip [1..] errors
 
@@ -545,8 +543,6 @@ solveRadialDescentClass chosen =
 
                 [ones, twos, thrs] = (\n -> filterBro (==n) ixses (toList1 $ last resTsCls)) <$> [1.0, 2.0, 3.0]
                 [wones, wtwos, wthrs] = (\n -> filterBro (==n) ixses (toList1 cst)) <$> [1.0, 2.0, 3.0]
-
-                showBools = concat . fmap (\b -> if b then "1" else "0")
 
             void $ plot (PNG $ printf "radial-descent-class-guesses-%f-%f-%f-%d-%f.png" rate1 rate2 mom2 epochs initRange)
                 [ Data2D     [Title "Ones", Style Points, Color Red  ]  [] ones

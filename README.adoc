@@ -1,0 +1,9 @@
+= Myslenie
+
+Neural networks implementation in Haskell.
+
+The program was created for artificial intelligence course on TUL.
+
+Uses hmatrix library to statically check operations on matrices.
+
+It has a nice CLI made with optparse-applicative.
